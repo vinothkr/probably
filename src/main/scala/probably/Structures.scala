@@ -44,4 +44,11 @@ class AllStructures(structures:ActorRef)(implicit val timeout:Timeout, val conte
       result <- (structure ? IsPresent(key)).mapTo[ProbableResult]
     ) yield result
   }
+
+  def statsOf(name:String) = {
+   for(
+     structure <- (structures ? CreateOrGet(name)).mapTo[ActorRef];
+     result <- (structure ? GetStats).mapTo[Stats]
+   ) yield result
+  }
 }

@@ -10,7 +10,10 @@ case class ProbableResult(value:Boolean, probability:Double)
 case class Add(key:String)
 case class AddAll(keys:List[String])
 case class IsPresent(key:String)
+case object GetStats
 case class Added(key:String)
+case class Stats(expectedError: Double)
+
 
 class BloomFilter(name:String) extends PersistentActor{
   val bloom = GoogleBloom.create(Funnels.stringFunnel(Charsets.UTF_8),1000000)
@@ -19,6 +22,7 @@ class BloomFilter(name:String) extends PersistentActor{
 
   override def receiveRecover: Receive = {
     case Add(key) => bloom.put(key)
+    case AddAll(keys) => keys.foreach(bloom.put)
     case RecoveryCompleted =>
   }
 
@@ -31,5 +35,7 @@ class BloomFilter(name:String) extends PersistentActor{
       persist(addAll){addAll => addAll.keys.foreach(bloom.put)}
 
     case IsPresent(key) => sender !(if(bloom.mightContain(key)) ProbableResult(true, 1.0 - bloom.expectedFpp()) else ProbableResult(false, 1.0))
+
+    case GetStats => sender ! Stats(bloom.expectedFpp())
   }
 }

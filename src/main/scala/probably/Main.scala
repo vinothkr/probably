@@ -17,6 +17,7 @@ import spray.json.DefaultJsonProtocol._
 trait Protocols {
   implicit val addedFormat = jsonFormat1(Added.apply)
   implicit val probableResultFormat = jsonFormat2(ProbableResult.apply)
+  implicit val statsFormat = jsonFormat1(Stats.apply)
 }
 
 
@@ -35,14 +36,17 @@ object Main extends App with AskSupport with Protocols {
           structures addAllTo(name, keys)
           Accepted
         }
+      } ~ get {
+        complete {
+          structures statsOf name
+        }
       }
     }~path(Segment/Segment) { (name,key)=> {
           put {
             complete {
               structures addTo(name, key)
             }
-          } ~
-            get {
+          } ~ get {
               complete {
                 structures getFrom(name, key)
               }
