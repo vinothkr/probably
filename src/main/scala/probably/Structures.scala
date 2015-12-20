@@ -33,6 +33,11 @@ class AllStructures(structures:ActorRef)(implicit val timeout:Timeout, val conte
     ) yield result
   }
 
+  def addAllTo(name:String, keys:List[String]) = {
+    for(structure <- (structures ? CreateOrGet(name)).mapTo[ActorRef])
+      structure ! AddAll(keys)
+  }
+
   def getFrom(name:String, key:String) = {
     for(
       structure <- (structures ? CreateOrGet(name)).mapTo[ActorRef];

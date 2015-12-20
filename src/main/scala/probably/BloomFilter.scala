@@ -8,6 +8,7 @@ case class ProbableResult(value:Boolean, probability:Double)
 
 
 case class Add(key:String)
+case class AddAll(keys:List[String])
 case class IsPresent(key:String)
 case class Added(key:String)
 
@@ -22,10 +23,13 @@ class BloomFilter(name:String) extends PersistentActor{
   }
 
   override def receiveCommand: Receive = {
-    case add:Add => {
+    case add:Add =>
       val _sender = sender()
       persist(add){add => bloom.put(add.key); _sender ! Added(add.key)}
-    }
+
+    case addAll:AddAll =>
+      persist(addAll){addAll => addAll.keys.foreach(bloom.put)}
+
     case IsPresent(key) => sender !(if(bloom.mightContain(key)) ProbableResult(true, 1.0 - bloom.expectedFpp()) else ProbableResult(false, 1.0))
   }
 }
