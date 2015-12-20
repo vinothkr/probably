@@ -5,6 +5,7 @@ import akka.event.Logging
 import akka.pattern.AskSupport
 import akka.persistence.Persistence
 import akka.util.Timeout
+import probably.structures.BloomFilter
 
 import scala.concurrent.ExecutionContext
 
@@ -17,7 +18,7 @@ class Structures extends Actor {
   override def receive: Receive = {
     case CreateOrGet(name) => {
       if(!(structures contains name))
-          structures = structures + (name -> context.system.actorOf(Props(classOf[BloomFilter], name), s"bloom-${name}"))
+          structures = structures + (name -> context.system.actorOf(Props(classOf[Structure], name, new BloomFilter()), s"bloom-${name}"))
       sender ! structures(name)
     }
     case m => logger.info(m.toString)

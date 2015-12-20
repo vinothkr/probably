@@ -17,7 +17,7 @@ import spray.json.DefaultJsonProtocol._
 trait Protocols {
   implicit val addedFormat = jsonFormat1(Added.apply)
   implicit val probableResultFormat = jsonFormat2(ProbableResult.apply)
-  implicit val statsFormat = jsonFormat1(Stats.apply)
+  implicit val statsFormat = jsonFormat2(Stats.apply)
 }
 
 
