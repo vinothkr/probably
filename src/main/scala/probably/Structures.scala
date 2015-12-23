@@ -5,7 +5,7 @@ import akka.event.Logging
 import akka.pattern.AskSupport
 import akka.persistence.{PersistentActor, RecoveryCompleted}
 import akka.util.Timeout
-import probably.structures.BloomFilter
+import probably.structures.StructureFactory
 
 import scala.concurrent.ExecutionContext
 
@@ -15,7 +15,11 @@ case class Get(name:String)
 case class Exists(name:String)
 case class StructureSettings(expectedInsertions: Int)
 
-class Structures extends PersistentActor {
+object Structures {
+  def structureName(set:String, name:String) = s"${set}-${name}"
+}
+
+class Structures(structureFactory:StructureFactory[_],  expectedErrorPercent:Double) extends PersistentActor {
   var structures = Map[String, ActorRef]()
   val logger = Logging(context.system, getClass)
 
@@ -28,8 +32,8 @@ class Structures extends PersistentActor {
 
   override def receiveCommand: Receive = {
     case request:Create => persist(request){request => sender ! create(request.name)}
-    case request:GetOrCreate => if(structures contains request.name) self.forward(Get(request.name))
-                                else self.forward(Create(request.name))
+    case GetOrCreate(name) => if(structures contains name) self.forward(Get(name))
+                                else self.forward(Create(name))
     case Get(name) => sender ! structures(name)
     case Exists(name) => sender ! (structures contains name)
     case m => logger.info(s"Ignoring $m")
@@ -37,38 +41,39 @@ class Structures extends PersistentActor {
 
   def create(name:String) = {
     if(!(structures contains name))
-      structures = structures + (name -> context.system.actorOf(Props(classOf[Structure], name, new BloomFilter()), s"bloom-${name}"))
+      structures = structures +
+        (name -> context.system.actorOf(Props(classOf[Structure], name, structureFactory.create(expectedErrorPercent)), s"${structureFactory.name}-${name}"))
     structures(name)
   }
 }
 
 
-class AllStructures(structures:ActorRef)(implicit val timeout:Timeout, val context: ExecutionContext) extends AskSupport {
-  def addTo(name:String, key:String) = {
+class AllStructures(structures:Map[String, ActorRef])(implicit val timeout:Timeout, val context: ExecutionContext) extends AskSupport {
+  def addTo(set:String, name:String, key:String) = {
     for(
-      structure <- (structures ? GetOrCreate(name)).mapTo[ActorRef];
+      structure <- (structures(set) ? GetOrCreate(name)).mapTo[ActorRef];
       result <- (structure ? Add(key)).mapTo[Added]
     ) yield result
   }
 
-  def addAllTo(name:String, keys:List[String]) = {
-    for(structure <- (structures ? GetOrCreate(name)).mapTo[ActorRef])
+  def addAllTo(set:String, name:String, keys:List[String]) = {
+    for(structure <- (structures(set) ? GetOrCreate(name)).mapTo[ActorRef])
       structure ! AddAll(keys)
   }
 
-  def getFrom(name:String, key:String) = {
+  def getFrom(set:String, name:String, key:String) = {
     for(
-      structure <- (structures ? Get(name)).mapTo[ActorRef];
+      structure <- (structures(set) ? Get(name)).mapTo[ActorRef];
       result <- (structure ? IsPresent(key)).mapTo[ProbableResult]
     ) yield result
   }
 
-  def statsOf(name:String) = {
+  def statsOf(set:String, name:String) = {
    for(
-     structure <- (structures ? Get(name)).mapTo[ActorRef];
+     structure <- (structures(set) ? Get(name)).mapTo[ActorRef];
      result <- (structure ? GetStats).mapTo[Stats]
    ) yield result
   }
 
-  def exists(name:String) = (structures ? Exists(name)).mapTo[Boolean]
+  def exists(set:String, name:String) = (structures(set) ? Exists(name)).mapTo[Boolean]
 }

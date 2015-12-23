@@ -8,6 +8,7 @@ lazy val root = (project in file(".")).
         "com.typesafe.akka" %% "akka-http-experimental"               % "2.0-M2",
         "com.typesafe.akka" %% "akka-persistence"                     % "2.4.1",
         "org.iq80.leveldb"  % "leveldb"                               % "0.7",
-        "com.typesafe.akka" %% "akka-http-spray-json-experimental"    % "2.0-M2"
+        "com.typesafe.akka" %% "akka-http-spray-json-experimental"    % "2.0-M2",
+        "com.twitter"       %% "algebird-core"                        % "0.11.0"
     )
   )

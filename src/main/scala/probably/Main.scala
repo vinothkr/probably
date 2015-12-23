@@ -8,11 +8,12 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{PathMatcher, Route}
 import akka.pattern.AskSupport
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
+import probably.structures.{BloomFilterFactory, HyperLogLogFactory}
 import spray.json.DefaultJsonProtocol._
 
 case class NotFoundMessage(name:String,message: String = "Not found")
@@ -32,30 +33,36 @@ object Main extends App with AskSupport with Protocols {
   implicit val timeout = Timeout(100, TimeUnit.SECONDS)
 
   val config = new Settings(ConfigFactory.load())
-  val structures = new AllStructures(system.actorOf(Props(classOf[Structures])))
+  val structures = Map(
+    "bloom" -> system.actorOf(Props(classOf[Structures], new BloomFilterFactory, 3.0)),
+    "hll" -> system.actorOf(Props(classOf[Structures], new HyperLogLogFactory, 3.0))
+  )
+  val allStructures = new AllStructures(structures)
+  val setSegment = structures.keys.zip(structures.keys).toMap
 
-  val routes:Route = path(Segment) { name=>
+
+  val routes:Route = path(setSegment/Segment) { (set,name) =>
       (post & entity(as[List[String]])) { keys =>
         complete {
-          structures addAllTo(name, keys)
+          allStructures addAllTo(set, name, keys)
           Accepted
         }
       } ~ get {
         complete {
-          (structures exists name).map[ToResponseMarshallable] { exists =>
-            if(exists) structures statsOf name else NotFound -> NotFoundMessage(name)
+          (allStructures exists (set, name)).map[ToResponseMarshallable] { exists =>
+            if(exists) allStructures statsOf (set,name) else NotFound -> NotFoundMessage(name)
           }
         }
       }
-    }~path(Segment/Segment) { (name,key)=> {
+    }~path(setSegment/Segment/Segment) { (set, name,key)=> {
           put {
             complete {
-              structures addTo(name, key)
+              allStructures addTo (set, name, key)
             }
           } ~ get {
               complete {
-                (structures exists name).map[ToResponseMarshallable] { exists =>
-                  if(exists) structures getFrom(name, key) else NotFound -> NotFoundMessage(name)
+                (allStructures exists (set,name)).map[ToResponseMarshallable] { exists =>
+                  if(exists) allStructures getFrom(set, name, key) else NotFound -> NotFoundMessage(name)
                 }
               }
             }

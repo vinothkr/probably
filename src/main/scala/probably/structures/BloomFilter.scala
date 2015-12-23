@@ -4,8 +4,8 @@ import com.google.common.base.Charsets
 import com.google.common.hash.{BloomFilter => GoogleBloom, Funnels}
 import probably.{ProbableResult, Stats, ProbableSet}
 
-class BloomFilter extends ProbableSet with Serializable {
-  var bloom = GoogleBloom.create(Funnels.stringFunnel(Charsets.UTF_8),1000000)
+class BloomFilter(expectedErrorPercent:Double) extends ProbableSet with Serializable {
+  var bloom = GoogleBloom.create(Funnels.stringFunnel(Charsets.UTF_8),1000000, expectedErrorPercent/100.0)
   var size = 0L
 
   override def put(key: String): Unit = if(!bloom.mightContain(key)) { bloom.put(key); size = size + 1}
